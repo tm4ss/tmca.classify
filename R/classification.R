@@ -99,7 +99,8 @@ tmca_classify <- setRefClass(
     validation_corpus = "character",
     validation_labels = "factor",
     validation_dfm_ngram = "Matrix",
-    validation_dfm_lda = "Matrix"
+    validation_dfm_lda = "Matrix",
+    last_AL_uncertainty = "numeric"
   ),
   methods = list(
     # dfm: document feature matrix
@@ -179,6 +180,8 @@ tmca_classify <- setRefClass(
       label_names <- levels(labels)
       previous_predictions <- factor(rep(levels(labels)[1], length(labels)), levels = levels(labels))
       stop_active_learning <- FALSE
+      last_AL_uncertainty <<- rep(0, length(labels))
+      names(last_AL_uncertainty) <<- as.character(1:length(labels))
 
       while (!stop_active_learning) {
 
@@ -210,7 +213,7 @@ tmca_classify <- setRefClass(
           type = type
         )
 
-        oracle <- select_queries(model, u_dfm, u_labels_idx, batch_size, verbose = verbose)
+        oracle <- select_queries(model, u_dfm, u_labels_idx, batch_size, s_labels, positive_class, verbose = verbose, strategy = "LC")
         labels[oracle$selected_queries] <<- oracle$oracle_decisions
 
         # predict all instances (for stopping criterion)
@@ -279,7 +282,7 @@ tmca_classify <- setRefClass(
 
       }
     },
-    select_queries = function(model, u_dfm, u_labels_idx, batch_size, verbose = 1, strategy = "LC") {
+    select_queries = function(model, u_dfm, u_labels_idx, batch_size, s_labels, positive_class, verbose = 1, strategy = "LC") {
       "Select queries for the (human) oracle by different strategies."
       if (strategy == "random") {
         # select random
@@ -301,8 +304,40 @@ tmca_classify <- setRefClass(
       } else if (strategy == "MC") {
         # select most certain
 
-      } else if (strategy == "DIFF") {
-        # difference to last run
+      } else if (strategy == "LCB") {
+        # browser()
+        pp <- sum(s_labels == positive_class) / length(s_labels)
+        pmax <- mean(c(0.5, 1 - pp))
+        predicted_labels_u <- predict(model, u_dfm, proba = T)
+        prob_positive <- predicted_labels_u$probabilities[, positive_class]
+        lidx <- prob_positive < pmax
+        uncertain_decisions <- rep(0, length(predicted_labels_u))
+        uncertain_decisions[lidx] <- prob_positive[lidx] / pmax
+        uncertain_decisions[!lidx] <- (1 - prob_positive[!lidx]) / pmax
+
+        # order and select
+        uncertain_decisions <- order(uncertain_decisions, decreasing = T)[1:batch_size]
+        selected_queries <- u_labels_idx[uncertain_decisions]
+
+      } else if (strategy == "LCBMC") {
+        # browser()
+        pp <- sum(s_labels == positive_class) / length(s_labels)
+        pmax <- mean(c(0.5, 1 - pp))
+        predicted_labels_u <- predict(model, u_dfm, proba = T)
+        prob_positive <- predicted_labels_u$probabilities[, positive_class]
+        lidx <- prob_positive < pmax
+        current_uncertain_decisions <- rep(0, length(predicted_labels_u))
+        current_uncertain_decisions[lidx] <- prob_positive[lidx] / pmax
+        current_uncertain_decisions[!lidx] <- (1 - prob_positive[!lidx]) / pmax
+
+        w0 <- 1 / length(s_labels)
+        uncertain_decisions <- current_uncertain_decisions - w0 * last_AL_uncertainty[as.character(u_labels_idx)]
+        last_AL_uncertainty[as.character(u_labels_idx)] <<- current_uncertain_decisions
+
+        # order and select
+        uncertain_decisions <- order(uncertain_decisions, decreasing = T)[1:batch_size]
+        selected_queries <- u_labels_idx[uncertain_decisions]
+
       } else {
         stop("Unknown query selection strategy")
       }
