@@ -7,7 +7,7 @@ Author: Gregor Wiedemann
 Maintainer: Gregor Wiedemann <gregor.wiedemann@uni-leipzig.de>
 Description: Classification and active learning for text.
 Depends: Matrix, SparseM, LiblineaR, topicmodels
-Imports: tm, irr
+Imports: tm, irr, hash, foreach, stringi, SnowballC, data.table
 License: GPL (>= 3)
 Encoding: UTF-8
 LazyData: false

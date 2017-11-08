@@ -168,8 +168,8 @@ This allows the active learning process to learn from all data.}
 This is useful for AL experimentation, when feature
 generation is costly.}
 
-\item{\code{select_queries(model, u_dfm, u_labels_idx, batch_size, verbose = 1,
-  strategy = "LC")}}{Select queries for the (human) oracle by different strategies.}
+\item{\code{select_queries(model, u_dfm, u_labels_idx, batch_size, s_labels, positive_class,
+  verbose = 1, strategy = "LC")}}{Select queries for the (human) oracle by different strategies.}
 
 \item{\code{set_validation_AL_corpus()}}{Sets validation hold out set to the same data as the
 primary classification set. This is for evaluation of
