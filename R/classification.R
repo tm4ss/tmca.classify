@@ -105,7 +105,7 @@ tmca_classify <- setRefClass(
   methods = list(
     # dfm: document feature matrix
     # labels: factor with class labels 0 - Negative class, 1 - Positive class, NA - unlabeled
-    initialize = function(corpus, labels = NULL, iteration = 1, gold_labels = factor(), stop_words = NULL, negation_words = NULL, language = "en", minimum_frequency = 2) {
+    initialize = function(corpus, labels = NULL, iteration = 1, gold_labels = factor(), stop_words = NULL, negation_words = NULL, language = "en", minimum_frequency = 2, extract_ngrams = TRUE) {
       "Creation of classification object from corpus.
       Corpus is supposed to be a character vector.
       More options for feature extraction are possible."
@@ -139,10 +139,16 @@ tmca_classify <- setRefClass(
         negation_words <<- read.csv(neg_file, sep = "\t", header = T, encoding = "UTF-8", stringsAsFactors = F)
       }
       language <<- language
-      dfm_ngram <<- extract_features_ngram(minimum_frequency = minimum_frequency)
+      if (extract_ngrams) {
+        dfm_ngram <<- extract_features_ngram(minimum_frequency = minimum_frequency)
+      } else {
+        message("No features extracted for corpus. Consider running extract_features_ngram().")
+        dfm_ngram <<- Matrix(0)
+      }
       dfm_lda <<- Matrix(0)
       lda_most_frequent_term <<- "the"
       validation_labels <<- factor()
+      validation_dfm_ngram <<- Matrix(0)
       validation_dfm_lda <<- Matrix(0)
     },
     active_learning = function(
@@ -157,7 +163,9 @@ tmca_classify <- setRefClass(
       stop_window = 3,
       type = 7,
       verbose = TRUE,
-      positive_class = NULL
+      positive_class = NULL,
+      strategy = "LC",
+      facets = NULL
     ) {
       "Active learning for classification. If gold labels are present,
       experiment mode is conducted. Otherwise, the user oracle is asked
@@ -213,7 +221,7 @@ tmca_classify <- setRefClass(
           type = type
         )
 
-        oracle <- select_queries(model, u_dfm, u_labels_idx, batch_size, s_labels, positive_class, verbose = verbose, strategy = "LC")
+        oracle <- select_queries(model, u_dfm, u_labels_idx, batch_size, s_labels, positive_class, verbose = verbose, strategy = strategy)
         labels[oracle$selected_queries] <<- oracle$oracle_decisions
 
         # predict all instances (for stopping criterion)
@@ -247,7 +255,13 @@ tmca_classify <- setRefClass(
         # validation set evaluation
         if (length(validation_labels) > 0) {
           v_predicted <- classify(get_dfm(validation = T))
-          v_result <- tmca_fscore(v_predicted, validation_labels, positive_class = positive_class)
+          v_result <- data.frame(tmca_fscore(v_predicted, validation_labels, positive_class = positive_class))
+          if (!is.null(facets)) {
+            v_proportional_result <- tmca_proportions(v_predicted, validation_labels, facets = facets, positive_class = positive_class)
+            v_prop <- c(v_proportional_result$rmsd, v_proportional_result$persons_r)
+            names(v_prop) <- c("rmsd", "r")
+            v_result <- cbind(v_result, t(v_prop))
+          }
           progress_validation <<- rbind(progress_validation, v_result)
         }
 
@@ -303,6 +317,14 @@ tmca_classify <- setRefClass(
 
       } else if (strategy == "MC") {
         # select most certain
+
+        # predict unlabeled instances
+        predicted_labels_u <- predict(model, u_dfm, proba = T)
+        # predicted_labels_u <- predict(model, u_dfm, decisionValues = T)
+
+        # select most probable examples
+        most_certain_decisions <- order(predicted_labels_u$probabilities[, 1], decreasing = T)[1:batch_size]
+        selected_queries <- u_labels_idx[most_certain_decisions]
 
       } else if (strategy == "LCB") {
         # browser()
@@ -678,7 +700,7 @@ tmca_classify <- setRefClass(
         featureMatrixFull <- featureMatrixFull[, featuresToKeep]
       }
 
-      if (identical(text_corpus, .self$corpus)) {
+      if (TRAIN & identical(text_corpus, .self$corpus)) {
         dfm_ngram <<- featureMatrixFull
       } else {
         return(featureMatrixFull)
@@ -808,13 +830,12 @@ tmca_classify <- setRefClass(
           theta <- theta + ldaPosterior$topics
         }
       }
-      theta <- theta / n_repeat
+      theta <- as.(theta / n_repeat, "dgCMatrix")
 
       if (TRAIN) {
-        dfm_lda <<- Matrix(theta)
+        dfm_lda <<- theta
       } else {
-        # return(Matrix(theta))
-        validation_dfm_lda <<- Matrix(theta)
+        validation_dfm_lda <<- theta
       }
 
     },
@@ -840,7 +861,7 @@ tmca_classify <- setRefClass(
       validation_labels <<- v_labels
       validation_dfm_ngram <<- extract_features_ngram(validation_corpus, TRAIN = F)
       if (nrow(dfm_lda) > 1) {
-        validation_dfm_lda <<- extract_features_lda(lda_corpus = v_corpus, TRAIN = F, iter = 100)
+        validation_dfm_lda <<- extract_features_lda(validation_corpus, TRAIN = F, iter = 100)
       }
     },
     set_validation_AL_corpus = function() {
@@ -884,6 +905,28 @@ tmca_classify <- setRefClass(
       progress <<- data.frame(row.names = F, stringsAsFactors = F)
       progress_validation <<- data.frame(row.names = F, stringsAsFactors = F)
       progress_examples <<- list()
+    },
+    load = function(o = tmca_classify()) {
+      corpus <<- o$corpus
+      labels <<- o$labels
+      gold_labels <<- o$gold_labels
+      iteration <<- o$iteration
+      progress <<- o$progress
+      progress_examples <<- o$progress_examples
+      progress_validation <<- o$progress_validation
+      stop_words <<- o$stop_words
+      negation_words <<- o$negation_words
+      language <<- o$language
+      dfm_ngram <<- o$dfm_ngram
+      dfm_lda <<- o$dfm_lda
+      model_svm <<- o$model_svm
+      model_lda <<- o$model_lda
+      lda_most_frequent_term <<- o$lda_most_frequent_term
+      validation_corpus <<- o$validation_corpus
+      validation_labels <<- o$validation_labels
+      validation_dfm_ngram <<- o$validation_dfm_ngram
+      validation_dfm_lda <<- o$validation_dfm_lda
+      last_AL_uncertainty <<- o$last_AL_uncertainty
     }
   )
 )
