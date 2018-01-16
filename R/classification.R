@@ -350,7 +350,7 @@ tmca_classify <- setRefClass(
         lidx <- prob_positive < pmax
         current_uncertain_decisions <- rep(0, length(predicted_labels_u))
         current_uncertain_decisions[lidx] <- prob_positive[lidx] / pmax
-        current_uncertain_decisions[!lidx] <- (1 - prob_positive[!lidx]) / pmax
+        current_uncertain_decisions[!lidx] <- (1 - prob_positive[!lidx]) / (1 - pmax)
 
         w0 <- 1 / length(s_labels)
         uncertain_decisions <- current_uncertain_decisions - w0 * last_AL_uncertainty[as.character(u_labels_idx)]
