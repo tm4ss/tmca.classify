@@ -335,7 +335,7 @@ tmca_classify <- setRefClass(
         lidx <- prob_positive < pmax
         uncertain_decisions <- rep(0, length(predicted_labels_u))
         uncertain_decisions[lidx] <- prob_positive[lidx] / pmax
-        uncertain_decisions[!lidx] <- (1 - prob_positive[!lidx]) / pmax
+        uncertain_decisions[!lidx] <- (1 - prob_positive[!lidx]) / (1 - pmax)
 
         # order and select
         uncertain_decisions <- order(uncertain_decisions, decreasing = T)[1:batch_size]
