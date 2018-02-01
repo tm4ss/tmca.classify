@@ -1,10 +1,10 @@
 Package: tmca.classify
 Type: Package
 Title: Classification and active learning for text (tmca.classify)
-Version: 0.0.1
-Date: 2017-10-14
+Version: 0.1
+Date: 2018-01-31
 Author: Gregor Wiedemann
-Maintainer: Gregor Wiedemann <gregor.wiedemann@uni-leipzig.de>
+Maintainer: Gregor Wiedemann <gwiedemann@informatik.uni-hamburg.de>
 Description: Classification and active learning for text.
 Depends: Matrix, SparseM, LiblineaR, topicmodels
 Imports: tm, irr, hash, foreach, stringi, SnowballC, data.table
