@@ -830,7 +830,7 @@ tmca_classify <- setRefClass(
           theta <- theta + ldaPosterior$topics
         }
       }
-      theta <- as.(theta / n_repeat, "dgCMatrix")
+      theta <- as(theta / n_repeat, "dgCMatrix")
 
       if (TRAIN) {
         dfm_lda <<- theta
