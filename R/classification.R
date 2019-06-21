@@ -802,7 +802,7 @@ tmca_classify <- setRefClass(
         reference_dtm <- reference_dtm[Matrix::rowSums(reference_dtm) > 0, ]
         # print(dim(reference_dtm))
         message("Computing LDA model on reference corpus")
-        model_lda <<- topicmodels::LDA(reference_dtm, k = K, method = "Gibbs", control = list(iter = iter, alpha = 0.1, delta = 0.1, verbose = verbose))
+        model_lda <<- topicmodels::LDA(reference_dtm, k = K, method = "Gibbs", control = list(iter = iter, alpha = 0.1, delta = 0.01, verbose = verbose))
         if (verbose > 0) {
           print(topicmodels::terms(model_lda, 10))
         }
